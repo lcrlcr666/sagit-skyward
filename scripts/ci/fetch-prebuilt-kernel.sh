@@ -33,12 +33,33 @@ UNPACK="$AOSP_DIR/system/tools/mkbootimg/unpack_bootimg.py"
 [ -f "$UNPACK" ] || { echo "!! 找不到 $UNPACK（先 repo sync）"; exit 1; }
 
 rm -rf "$OUTDIR/unpacked"; mkdir -p "$OUTDIR/unpacked"
-# Pie 的 unpack_bootimg.py 参数：--boot_img / --out / --format=mkbootimg
-if ! python3 "$UNPACK" --boot_img "$OUTDIR/$MODEL" --out "$OUTDIR/unpacked" --format=mkbootimg 2>"$OUTDIR/unpack.err"; then
-    echo ">> --format 参数不被支持，退回旧用法"
-    python3 "$UNPACK" --boot_img "$OUTDIR/$MODEL" --out "$OUTDIR/unpacked" 2>&1 | tail -20
+
+# AOSP 9 的 unpack_bootimg.py 可能是 py2 语法，也可能 py3，逐个解释器试。
+# （CI 里 `python` 已被我们指回 python2，所以三种都覆盖到）
+try_unpack() {
+    local py="$1"; shift
+    command -v "$py" >/dev/null 2>&1 || return 1
+    rm -rf "$OUTDIR/unpacked"; mkdir -p "$OUTDIR/unpacked"
+    "$py" "$UNPACK" --boot_img "$OUTDIR/$MODEL" --out "$OUTDIR/unpacked" "$@" 2>"$OUTDIR/unpack.err"
+}
+
+ok=0
+for py in python3 python2 python; do
+    for extra in "--format=mkbootimg" ""; do
+        # shellcheck disable=SC2086
+        if try_unpack "$py" $extra && [ -s "$OUTDIR/unpacked/kernel" ]; then
+            echo ">> 解包成功：$py $extra"
+            ok=1; break 2
+        fi
+    done
+done
+if [ $ok -ne 1 ]; then
+    echo "!! unpack_bootimg 全部尝试失败，最后一次错误："
+    cat "$OUTDIR/unpack.err" 2>/dev/null | tail -15
+    ls -lh "$OUTDIR/unpacked" 2>/dev/null
+    exit 1
 fi
-ls -lh "$OUTDIR/unpacked" 2>/dev/null || { cat "$OUTDIR/unpack.err"; exit 1; }
+ls -lh "$OUTDIR/unpacked"
 
 K="$OUTDIR/unpacked/kernel"
 [ -s "$K" ] || { echo "!! 没抽到 kernel"; exit 1; }
