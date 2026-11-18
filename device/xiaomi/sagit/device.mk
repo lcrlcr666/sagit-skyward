@@ -8,41 +8,25 @@
 LOCAL_PATH := device/xiaomi/sagit
 
 # ---------------------------------------------------------------- 安全清单（必有）
+# 教训：minimal-manifest（twrp-9.0）是 Android 9.0.0_r47 的裁剪树，
+# `unzip` / `zip` / `tar` / `libwpa_client` / `wpa_cli` / `wpa_supplicant.conf`
+# 这些「看起来该有」的模块名在树里并不存在，写进 PRODUCT_PACKAGES 会在 lunch
+# 阶段直接报 "module not found" 而中断。TWRP 镜像本身已经带了 toybox / mke2fs /
+# f2fs-tools / unzip，所以这里只声明 recovery 里确实需要、且确认存在的模块：
 PRODUCT_PACKAGES += \
-    libcrypto \
-    libssl \
-    tune2fs \
-    e2fsdroid \
-    mke2fs \
-    fsck.f2fs \
-    tar \
-    toybox \
-    unzip \
-    zip
-
-# ---------------------------------------------------------------- Wi-Fi 用户态
-PRODUCT_PACKAGES += \
-    libwpa_client \
     wpa_supplicant \
-    wpa_supplicant.conf \
-    wpa_cli \
     dhcpcd
 
 # ---------------------------------------------------------------- 可选（按树里是否存在打开）
-# 注意：wificond / hostapd / dnsmasq / curl / ip / ifconfig / ntfs-3g / exfatprogs
-# 在 TWRP 最小树里不一定有。缺哪个就删哪行，或者改用外部预编译二进制
-# （放进 device/xiaomi/sagit/prebuilt/bin 并加 Android.mk，见 §5）。
+# 已核对 manifest：external/wpa_supplicant_8、external/dhcpcd-6.8.2、
+# external/curl、external/dnsmasq、external/libnl、external/toybox、
+# external/e2fsprogs、external/f2fs-tools、external/squashfs-tools 都在；
+# external/hostapd 不在（所以 hostapd 永远别打开）。
 # PRODUCT_PACKAGES += \
-#     hostapd \
-#     dnsmasq \
 #     curl \
-#     ip \
-#     ifconfig \
+#     dnsmasq \
 #     libnl \
-#     p7zip \
-#     dosfstools \
-#     sgdisk \
-#     vim
+#     squashfs-tools
 
 # 若树里有 curl 才打开（romget.sh 优先用 curl，没有则退 wget / busybox wget）
 # TWRP 最小 manifest 不一定带了 external/curl，开了会报 "module curl not found"
