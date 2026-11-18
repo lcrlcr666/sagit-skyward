@@ -21,7 +21,7 @@ on:
         options: ['true', 'false']
         default: 'true'
       prebuilt_kernel_url:
-        description: '预编译 Image.gz-dtb 直链（留空则从 kernel_repo 的产物地址取）'
+        description: '预编译 Image.gz-dtb 直链（留空=自动从官方 TWRP 镜像抽内核）'
         default: ''
       manifest_branch:
         description: 'recovery manifest 分支'

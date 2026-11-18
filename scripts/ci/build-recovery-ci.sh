@@ -78,13 +78,16 @@ if [ "$KERNEL_MODE" = "source" ]; then
         echo 'TARGET_KERNEL_CLANG_COMPILE := true' >> device/xiaomi/sagit/BoardConfig.mk
     fi
 else
-    [ -n "${PREBUILT_KERNEL_URL:-}" ] || {
-        echo "!! KERNEL_MODE=prebuilt 但没有 PREBUILT_KERNEL_URL"
-        echo "   传一个可用的 Image.gz-dtb 直链，或把 kernel_mode 改成 source"
-        exit 1
-    }
-    echo ">> 下载预编译内核"
-    curl -fL --retry 3 -o kernel/Image.gz-dtb "$PREBUILT_KERNEL_URL"
+    # prebuilt 模式：有直链就用直链，没有就自动从官方 TWRP 镜像里抽内核
+    if [ -n "${PREBUILT_KERNEL_URL:-}" ]; then
+        echo ">> 下载预编译内核：$PREBUILT_KERNEL_URL"
+        curl -fL --retry 3 --max-time 600 -o kernel/Image.gz-dtb "$PREBUILT_KERNEL_URL"
+    else
+        echo ">> 未提供直链，从官方 TWRP 镜像抽内核（kernel_mode=prebuilt 的默认路径）"
+        OUTDIR="$AOSP_DIR/kernel-prebuilt" \
+            bash "${GITHUB_WORKSPACE:-$PWD}/scripts/ci/fetch-prebuilt-kernel.sh" "$AOSP_DIR"
+        cp "$AOSP_DIR/kernel-prebuilt/Image.gz-dtb" kernel/Image.gz-dtb
+    fi
     ls -lh kernel/Image.gz-dtb
     echo "TARGET_PREBUILT_KERNEL := $AOSP_DIR/kernel/Image.gz-dtb" >> device/xiaomi/sagit/BoardConfig.mk
 fi
