@@ -15,6 +15,11 @@ on:
       kernel_branch:
         description: '内核分支'
         default: 'lineage-18.1'
+      kernel_clang:
+        description: 'kernel_mode=source 时用 clang 编内核（jammy 缺 32 位 ncurses，建议 true）'
+        type: choice
+        options: ['true', 'false']
+        default: 'true'
       prebuilt_kernel_url:
         description: '预编译 Image.gz-dtb 直链（留空则从 kernel_repo 的产物地址取）'
         default: ''
@@ -105,6 +110,7 @@ jobs:
           KERNEL_MODE: ${{ inputs.kernel_mode || 'prebuilt' }}
           KERNEL_REPO: ${{ inputs.kernel_repo || 'https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git' }}
           KERNEL_BRANCH: ${{ inputs.kernel_branch || 'lineage-18.1' }}
+          KERNEL_CLANG: ${{ inputs.kernel_clang || 'true' }}
           PREBUILT_KERNEL_URL: ${{ inputs.prebuilt_kernel_url }}
           DEVICE_DIR: ${{ github.workspace }}/device/xiaomi/sagit
           AOSP_DIR: ${{ runner.temp }}/aosp
