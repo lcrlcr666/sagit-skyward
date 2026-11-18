@@ -108,7 +108,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-sagit-${{ github.run_id }}
+          key: ccache-sagit-${{ hashFiles('device/xiaomi/sagit/**','kernel/sagit-wifi.fragment') }}
           restore-keys: |
             ccache-sagit-
             ccache-sagit

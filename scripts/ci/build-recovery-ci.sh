@@ -30,7 +30,10 @@ export PATH="$HOME/bin:$PATH"
 export USE_CCACHE=1
 export CCACHE_DIR="$HOME/.ccache"
 export CCACHE_EXEC="$(command -v ccache || echo /usr/bin/ccache)"
-export CCACHE_MAXSIZE=12G
+export CCACHE_MAXSIZE=8G      # GitHub cache 上限 10G，留余量
+export CCACHE_COMPRESS=true
+export CCACHE_COMPRESSLEVEL=6
+export CCACHE_SLOPPINESS=time_macros,include_file_ctime,include_file_mtime
 export ALLOW_MISSING_DEPENDENCIES=true      # TWRP 最小树必备
 export WITH_SU=false
 df -h / | tail -1

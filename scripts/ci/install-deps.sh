@@ -53,6 +53,25 @@ fi
 echo "--- ncurses 5/6 现状 ---"
 ldconfig -p | grep -E 'libtinfo\.so\.(5|6)|libncurses\.so\.5' || echo "!! 仍缺 ncurses5 兼容库，构建会失败"
 
+# ---------------------------------------------------------------------------
+# AOSP 9 里还有一批 py2 语法的构建脚本（如 build/make/tools/check_radio_versions.py），
+# 而它们用的是 `#!/usr/bin/env python`。之前装了 python-is-python3，于是 py3 去跑
+# py2 代码 → SyntaxError: Missing parentheses in call to 'print'。
+# 正确做法：把 `python` 指回 python2（AOSP 9 的约定），`python3` 仍独立可用。
+# /usr/local/bin 在 PATH 里优先于 /usr/bin，所以不会和 python-is-python3 打架。
+# ---------------------------------------------------------------------------
+if ! command -v python2 >/dev/null 2>&1; then
+    echo ">> 安装 python2（AOSP 9 的 py2 构建脚本需要）"
+    sudo apt-get install -y python2 >/dev/null 2>&1 || \
+        sudo apt-get install -y python2.7 >/dev/null 2>&1 || true
+fi
+if command -v python2 >/dev/null 2>&1; then
+    sudo ln -sf "$(command -v python2)" /usr/local/bin/python
+    echo ">> python -> $(readlink -f /usr/local/bin/python)  ($(python --version 2>&1))"
+else
+    echo "!! 没有 python2，check_radio_versions.py 等 py2 脚本会在 12% 进度处失败"
+fi
+
 # repo 工具
 mkdir -p "$HOME/bin"
 curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
