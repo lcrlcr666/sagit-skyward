@@ -42,8 +42,14 @@ echo 4095 > /sys/class/leds/lcd-backlight/brightness 2>/dev/null
 # 触摸：evdev 自动识别；若坐标错乱，用 xinput 校准
 xinput list 2>/dev/null | grep -i -E 'touch|synaptics' | head -3
 
-matchbox-window-manager -use_titlebar no >/dev/null 2>&1 &
-sleep 1
+# 窗口管理器：有 openbox 就用（kiosk 全屏其实不依赖 WM），没有就裸跑
+if command -v openbox >/dev/null 2>&1; then
+    openbox >/dev/null 2>&1 &
+    sleep 1
+elif command -v matchbox-window-manager >/dev/null 2>&1; then
+    matchbox-window-manager -use_titlebar no >/dev/null 2>&1 &
+    sleep 1
+fi
 
 CHROME_FLAGS="
  --no-sandbox --no-first-run --no-default-browser-check

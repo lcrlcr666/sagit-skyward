@@ -87,6 +87,15 @@ else
 fi
 
 step "4. lunch"
+# 关键：repo 的 linkfile 有时不生成，gettop 会失败并让 envsetup 去 source
+# /vendor/omni/build/envsetup.sh（报 No such file or directory）。显式补洞：
+export TOP="$AOSP_DIR"
+[ -e build/core ]        || ln -sfn make/core        build/core
+[ -e build/envsetup.sh ] || ln -sfn make/envsetup.sh build/envsetup.sh
+[ -e build/target ]      || ln -sfn make/target      build/target
+[ -e build/tools ]       || ln -sfn make/tools       build/tools
+ls -ld build/core build/envsetup.sh
+
 source build/envsetup.sh
 lunch skyward_sagit-eng || { echo "!! lunch 失败：检查 AndroidProducts.mk / 缺模块"; exit 1; }
 

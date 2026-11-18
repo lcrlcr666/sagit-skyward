@@ -51,13 +51,15 @@ EOF
 
 PKGS="
 xorg-server xf86-video-fbdev xf86-input-evdev xf86-input-libinput xinput
-matchbox-window-manager xset xrandr xinit
+openbox xset xrandr xinit
 chromium chromium-chromedriver
-font-noto font-noto-cjk font-noto-emoji ttf-dejavu
+font-noto font-noto-cjk font-noto-emoji font-dejavu
 alsa-utils alsa-plugins pulseaudio pulseaudio-utils
 busybox curl wget tzdata
 mesa mesa-egl mesa-gles
 "
+# 注：Alpine v3.19 没有 matchbox-window-manager / ttf-dejavu，
+#     对应包名是 openbox 与 font-dejavu（已用 APKINDEX 核对过）
 echo ">> 安装用户空间（约 900MB 下载，慢）"
 SKIPPED=""
 if ! chroot "$ROOT" /sbin/apk add --no-cache $PKGS; then
