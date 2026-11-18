@@ -103,6 +103,19 @@ set +u
 source build/envsetup.sh
 lunch skyward_sagit-eng || { echo "!! lunch 失败：检查 AndroidProducts.mk / 缺模块"; exit 1; }
 
+# 编译前先验一次 host 预编译 clang 能不能跑（缺 libtinfo.so.5 时在这里就报清楚，
+# 不用等到 40 秒后 ninja 报一个含糊的 FAILED）
+PRECLANG=$(ls -d prebuilts/clang/host/linux-x86/clang-*/bin/clang 2>/dev/null | head -1)
+if [ -n "$PRECLANG" ]; then
+    if "$PRECLANG" --version >/dev/null 2>&1; then
+        echo ">> host clang OK: $PRECLANG ($("$PRECLANG" --version 2>/dev/null | head -1))"
+    else
+        echo "!! host clang 无法运行：$PRECLANG"
+        ldd "$PRECLANG" 2>/dev/null | grep -E 'not found' || true
+        echo "   典型原因：缺 libtinfo.so.5（ncurses5），见 scripts/ci/install-deps.sh"
+    fi
+fi
+
 step "5. 编译 recoveryimage（首次约 50-70 分钟）"
 # 注意：mka 是 envsetup.sh 定义的 shell 函数，不能用 `/usr/bin/time` 包装
 # （会报 "cannot run mka: No such file or directory"）。整段输出落盘，失败可查。
