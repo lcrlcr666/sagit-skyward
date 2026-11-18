@@ -19,13 +19,45 @@ URL="${TWRP_URL:-https://dl.twrp.me/sagit/$MODEL}"
 OUTDIR="${OUTDIR:-$PWD/kernel-prebuilt}"
 
 echo ">> AOSP 树：$AOSP_DIR"
-echo ">> TWRP 镜像：$URL"
 mkdir -p "$OUTDIR"
 
-if [ ! -s "$OUTDIR/$MODEL" ]; then
-    curl -fL --retry 3 --retry-delay 5 --max-time 600 -o "$OUTDIR/$MODEL.tmp" "$URL"
-    mv "$OUTDIR/$MODEL.tmp" "$OUTDIR/$MODEL"
+# boot image 前 8 字节必须是 "ANDROID!"。twrp.me 对没有浏览器的请求会返回
+# 下载页 HTML（实测 6.8KB 的页面），直接当 img 用会导致后续解包全部错乱。
+is_bootimg() {
+    [ -s "$1" ] || return 1
+    [ "$(head -c 8 "$1" 2>/dev/null)" = "ANDROID!" ]
+}
+
+CANDIDATES="${TWRP_URLS:-https://dl.twrp.me/sagit/$MODEL https://eu.dl.twrp.me/sagit/$MODEL https://dl.twrp.me/sagit/$MODEL.html}"
+
+if is_bootimg "$OUTDIR/$MODEL"; then
+    echo ">> 已有本地镜像，跳过下载"
+else
+    for url in $CANDIDATES; do
+        echo ">> 尝试下载：$url"
+        rm -f "$OUTDIR/$MODEL" "$OUTDIR/$MODEL.tmp"
+        if ! curl -fL --retry 2 --retry-delay 3 --max-time 600 \
+                -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' \
+                -o "$OUTDIR/$MODEL.tmp" "$url"; then
+            echo "   下载失败"; continue
+        fi
+        if is_bootimg "$OUTDIR/$MODEL.tmp"; then
+            mv "$OUTDIR/$MODEL.tmp" "$OUTDIR/$MODEL"
+            echo "   OK（ANDROID! 校验通过）"
+            break
+        fi
+        echo "   !! 不是 boot image，前 40 字节：$(head -c 40 "$OUTDIR/$MODEL.tmp" | tr -d '\0' | tr '\n' ' ')"
+        echo "      大概率是 twrp.me 的下载页 HTML，需要直链镜像"
+        rm -f "$OUTDIR/$MODEL.tmp"
+    done
 fi
+
+is_bootimg "$OUTDIR/$MODEL" || {
+    echo "!! 取不到可用的 TWRP 镜像。两条出路："
+    echo "   ① 用 twrp_urls 输入指定一个真直链（如自建镜像/网盘直链）"
+    echo "   ② 改用 kernel_mode=source（脚本会自动修 clang-stable 软链）"
+    exit 1
+}
 ls -lh "$OUTDIR/$MODEL"
 echo ">> sha256: $(sha256sum "$OUTDIR/$MODEL" | cut -d' ' -f1)"
 

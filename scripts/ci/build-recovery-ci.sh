@@ -114,6 +114,34 @@ set +u
 source build/envsetup.sh
 lunch skyward_sagit-eng || { echo "!! lunch 失败：检查 AndroidProducts.mk / 缺模块"; exit 1; }
 
+# ---------------------------------------------------------------------------
+# 内核 clang 自愈：TWRP 最小树里 prebuilts/clang/host/linux-x86/clang-stable
+# 这个软链可能不存在（或指向未同步的版本），内核对源码编译时会用它当 CC，
+# 于是报 "clang-stable/bin/clang: No such file" 并连带
+# "Cannot use CONFIG_CC_STACKPROTECTOR_STRONG"（其实是编译器根本没跑起来）。
+# 这里挑一个真实存在且可执行的 clang-* 版本建软链。
+# ---------------------------------------------------------------------------
+CLDIR=prebuilts/clang/host/linux-x86
+if [ -d "$CLDIR" ]; then
+    if [ ! -x "$CLDIR/clang-stable/bin/clang" ]; then
+        echo ">> clang-stable 不可用，挑选可用版本建软链"
+        for v in $(ls -d "$CLDIR"/clang-r* "$CLDIR"/clang-[0-9]* 2>/dev/null | sort -V -r); do
+            if [ -x "$v/bin/clang" ]; then
+                ln -sfn "$(basename "$v")" "$CLDIR/clang-stable"
+                echo ">> clang-stable -> $(basename "$v")"
+                break
+            fi
+        done
+    fi
+    echo "--- 可用 clang ---"
+    ls -d "$CLDIR"/clang-* 2>/dev/null | head -8
+    if [ -x "$CLDIR/clang-stable/bin/clang" ]; then
+        echo ">> clang-stable 可执行：$("$CLDIR/clang-stable/bin/clang" --version 2>/dev/null | head -1)"
+    else
+        echo "!! 仍无可用 clang-stable，内核源码编译会失败（可改 kernel_mode=prebuilt）"
+    fi
+fi
+
 # 编译前先验一次 host 预编译 clang 能不能跑（缺 libtinfo.so.5 时在这里就报清楚，
 # 不用等到 40 秒后 ninja 报一个含糊的 FAILED）
 PRECLANG=$(ls -d prebuilts/clang/host/linux-x86/clang-*/bin/clang 2>/dev/null | head -1)
