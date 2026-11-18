@@ -1,0 +1,53 @@
+name: debug-rootfs
+
+# 只用来快速定位 rootfs（Alpine + Chromium）构建失败，不影响正式 build.yml
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾磁盘
+        run: bash scripts/ci/free-disk.sh
+
+      - name: 依赖 + binfmt 诊断
+        run: |
+          set -x
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-user-static binfmt-support e2fsprogs curl bzip2
+          echo "--- qemu ---"; ls -l /usr/bin/qemu-aarch64-static
+          echo "--- binfmt_misc 挂载 ---"; mount | grep binfmt || true
+          echo "--- 已注册 handler ---"; ls /proc/sys/fs/binfmt_misc/ 2>/dev/null || true
+          sudo update-binfmts --enable qemu-aarch64 || true
+          echo "--- handler 内容 ---"; cat /proc/sys/fs/binfmt_misc/qemu-aarch64 2>/dev/null || echo "无 qemu-aarch64 handler"
+          echo "--- 直接测试 aarch64 执行 ---"
+          curl -fsSL -o /tmp/mini.tgz https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/alpine-minirootfs-3.19.0-aarch64.tar.gz
+          mkdir -p /tmp/t && tar -xzf /tmp/mini.tgz -C /tmp/t
+          cp /usr/bin/qemu-aarch64-static /tmp/t/usr/bin/
+          chroot /tmp/t /bin/sh -c 'echo AARCH64_EXEC_OK; uname -m; cat /etc/alpine-release' || echo "!! chroot 执行失败"
+
+      - name: 构建（带 xtrace）
+        continue-on-error: true
+        env:
+          SIZE_MB: '2560'
+        run: |
+          sudo -E bash scripts/ci/build-rootfs-ci.sh > /tmp/build.log 2>&1 || true
+          echo "===== 最后 120 行 ====="
+          tail -120 /tmp/build.log
+
+      - name: 上传完整日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-build-log
+          path: |
+            /tmp/build.log
+          if-no-files-found: ignore
+          retention-days: 3

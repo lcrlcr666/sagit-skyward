@@ -9,6 +9,7 @@
 #   正确做法是把浏览器跑在 recovery 内核之上的第二个用户空间里 ——
 #   同一块 /dev/fb0，Xorg(fbdev) + Chromium kiosk，退出 kiosk 就回到 recovery 界面。
 set -euo pipefail
+trap 'rc=$?; echo "!! 失败于第 $LINENO 行 (rc=$rc): $BASH_COMMAND" >&2' ERR
 
 VER=${ALPINE_VER:-3.19}
 ARCH=aarch64
@@ -58,10 +59,19 @@ busybox curl wget tzdata
 mesa mesa-egl mesa-gles
 "
 echo ">> 安装用户空间（约 900MB 下载，慢）"
-chroot "$ROOT" /sbin/apk add --no-cache --update $PKGS || {
-    echo ">> 重试：跳过 post-install 脚本"
-    chroot "$ROOT" /sbin/apk add --no-cache --no-scripts $PKGS
-}
+SKIPPED=""
+if ! chroot "$ROOT" /sbin/apk add --no-cache $PKGS; then
+    echo ">> 整体安装失败，改为逐个安装，缺哪个跳过哪个"
+    for p in $PKGS; do
+        if chroot "$ROOT" /sbin/apk add --no-cache --no-scripts "$p"; then
+            :
+        else
+            echo "   !! 跳过不存在的包：$p"
+            SKIPPED="$SKIPPED $p"
+        fi
+    done
+    [ -n "$SKIPPED" ] && echo ">> 被跳过的包：$SKIPPED"
+fi
 
 # ---------------------------------------------------------------- overlay
 OVL="$(dirname "$0")/overlay"
