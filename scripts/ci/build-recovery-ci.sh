@@ -96,11 +96,16 @@ export TOP="$AOSP_DIR"
 [ -e build/tools ]       || ln -sfn make/tools       build/tools
 ls -ld build/core build/envsetup.sh
 
+# envsetup.sh / vendor/omni/vendorsetup.sh 里有未定义变量（实测 `version`），
+# 本脚本开着 set -u 会直接 "version: unbound variable" 退出。
+# source 与 mka 期间统一关掉 nounset。
+set +u
 source build/envsetup.sh
 lunch skyward_sagit-eng || { echo "!! lunch 失败：检查 AndroidProducts.mk / 缺模块"; exit 1; }
 
 step "5. 编译 recoveryimage（首次约 50-70 分钟）"
 /usr/bin/time -v mka -j"$JOBS" recoveryimage 2>&1 | tail -40 || true
+set -u
 IMG=out/target/product/sagit/recovery.img
 [ -f "$IMG" ] || { echo "!! 没有产出 $IMG"; ls -l out/target/product/sagit/ | tail -20; exit 1; }
 

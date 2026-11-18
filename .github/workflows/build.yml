@@ -33,6 +33,14 @@ on:
         description: '同时发布到 Release'
         type: boolean
         default: false
+      run_recovery:
+        description: '跑 recovery 构建（调试时关掉可省 60 分钟）'
+        type: boolean
+        default: true
+      run_rootfs:
+        description: '跑浏览器镜像构建（已出过镜像可关掉省 25 分钟）'
+        type: boolean
+        default: true
   push:
     tags: ['v*']
   pull_request:
@@ -78,6 +86,7 @@ jobs:
 
   # ------------------------------------------------------------------ recovery.img
   recovery:
+    if: ${{ inputs.run_recovery != false }}
     runs-on: ubuntu-22.04
     timeout-minutes: 330
     steps:
@@ -133,6 +142,7 @@ jobs:
 
   # ------------------------------------------------------------------ 浏览器内核镜像
   rootfs:
+    if: ${{ inputs.run_rootfs != false }}
     runs-on: ubuntu-22.04
     timeout-minutes: 180
     steps:
