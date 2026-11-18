@@ -45,8 +45,13 @@ mkdir -p "$AOSP_DIR" && cd "$AOSP_DIR"
 if [ ! -d .repo ]; then
     repo init -u "$MANIFEST" -b "$MANIFEST_BRANCH" --depth=1 --no-repo-verify
 fi
+# 补 minimal-manifest 缺的项目（mkbootimg：打包 recovery.img 必需，
+# 也是我们抽 TWRP 内核时 unpack_bootimg.py 的来源）
+mkdir -p .repo/local_manifests
+cp "${GITHUB_WORKSPACE:-$PWD}/scripts/ci/local_manifests.xml" .repo/local_manifests/sagit.xml
 repo sync -c -j"$JOBS" --force-sync --no-clone-bundle --no-tags --fail-fast
 du -sh . 2>/dev/null | tail -1
+[ -f system/tools/mkbootimg/mkbootimg.py ] && echo ">> mkbootimg 已就位" || echo "!! mkbootimg 仍缺失"
 
 step "2. 放入设备树"
 mkdir -p device/xiaomi
