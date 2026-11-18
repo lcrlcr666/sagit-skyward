@@ -1,0 +1,196 @@
+name: build
+
+# 小米6 (sagit) · Skyward Recovery + 浏览器内核 · GitHub Actions 云端构建
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_mode:
+        description: '内核来源'
+        type: choice
+        options: [prebuilt, source]
+        default: prebuilt
+      kernel_repo:
+        description: '内核仓库（kernel_mode=source 时使用）'
+        default: 'https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git'
+      kernel_branch:
+        description: '内核分支'
+        default: 'lineage-18.1'
+      prebuilt_kernel_url:
+        description: '预编译 Image.gz-dtb 直链（留空则从 kernel_repo 的产物地址取）'
+        default: ''
+      manifest_branch:
+        description: 'recovery manifest 分支'
+        default: 'twrp-9.0'
+      rootfs_size_mb:
+        description: '浏览器镜像大小(MB)，4G 内存机建议 3072'
+        default: '2560'
+      make_release:
+        description: '同时发布到 Release'
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'device/**'
+      - 'browser/**'
+      - 'wifi/**'
+      - 'scripts/**'
+      - '.github/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+  MANIFEST: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git
+
+jobs:
+  # ------------------------------------------------------------------ 静态检查
+  lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck（不阻断构建）
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          find . -name '*.sh' -not -path './out/*' -print0 \
+            | xargs -0 shellcheck -S warning -e SC1091,SC2086,SC3043,SC2015 || true
+      - name: 校验设备树关键开关
+        run: |
+          set -e
+          grep -q 'BOARD_BOOTIMG_HEADER_VERSION := 0' device/xiaomi/sagit/BoardConfig.mk
+          grep -q 'TW_LOAD_VENDOR_MODULES' device/xiaomi/sagit/BoardConfig.mk
+          grep -q 'sagit-wifi-up.sh' device/xiaomi/sagit/device.mk
+          test -f device/xiaomi/sagit/root/etc/WCNSS_qcom_cfg.ini
+          echo "设备树自检通过"
+
+  # ------------------------------------------------------------------ recovery.img
+  recovery:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 8（AOSP 9 硬性要求）
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: 腾出磁盘 + 8G swap
+        run: bash scripts/ci/free-disk.sh
+
+      - name: 安装构建依赖
+        run: bash scripts/ci/install-deps.sh
+
+      - name: ccache 缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-sagit-${{ github.run_id }}
+          restore-keys: |
+            ccache-sagit-
+            ccache-sagit
+
+      - name: 同步源码 + 编译 recovery
+        env:
+          MANIFEST_BRANCH: ${{ inputs.manifest_branch || 'twrp-9.0' }}
+          KERNEL_MODE: ${{ inputs.kernel_mode || 'prebuilt' }}
+          KERNEL_REPO: ${{ inputs.kernel_repo || 'https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git' }}
+          KERNEL_BRANCH: ${{ inputs.kernel_branch || 'lineage-18.1' }}
+          PREBUILT_KERNEL_URL: ${{ inputs.prebuilt_kernel_url }}
+          DEVICE_DIR: ${{ github.workspace }}/device/xiaomi/sagit
+          AOSP_DIR: ${{ runner.temp }}/aosp
+        run: bash scripts/ci/build-recovery-ci.sh
+
+      - name: 汇总产物
+        run: |
+          mkdir -p "$ARTIFACT_DIR"
+          cp "${{ runner.temp }}/aosp/out/target/product/sagit/recovery.img" "$ARTIFACT_DIR/"
+          cd "$ARTIFACT_DIR"
+          sha256sum recovery.img > recovery.img.sha256
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovery-sagit
+          path: artifacts/*
+          retention-days: 14
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ 浏览器内核镜像
+  rootfs:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾出磁盘
+        run: bash scripts/ci/free-disk.sh
+
+      - name: aarch64 用户态模拟环境
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            qemu-user-static binfmt-support e2fsprogs curl bzip2 zip
+          sudo update-binfmts --enable qemu-aarch64 || true
+          ls -l /usr/bin/qemu-aarch64-static
+
+      - name: 生成 Alpine + Chromium 镜像
+        env:
+          SIZE_MB: ${{ inputs.rootfs_size_mb || '2560' }}
+        run: sudo -E bash scripts/ci/build-rootfs-ci.sh
+
+      - name: 分卷 + 校验（单文件 >2G 上传会失败）
+        run: bash scripts/ci/assemble-parts.sh split
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-sagit
+          path: artifacts/*
+          retention-days: 14
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ Release
+  release:
+    needs: [recovery, rootfs]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.make_release == true
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: 整理
+        run: |
+          ls -lhR dist
+          cd dist && sha256sum *.img* > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('ci-{0}', github.run_number) }}
+          name: sagit skyward ${{ github.ref_name }}
+          body: |
+            Mi 6 (sagit) Skyward Recovery + 浏览器内核（CI 自动构建）
+
+            **刷入**
+            ```
+            fastboot flash recovery recovery.img
+            ```
+            **浏览器内核**
+            ```
+            cat rootfs-sagit.img.part-* > rootfs.img
+            adb shell "mkdir -p /data/linux"
+            adb push rootfs.img /data/linux/rootfs.img
+            adb shell "/system/bin/sh /sbin/linux-boot.sh"
+            ```
+            首次运行后 WiFi/浏览器日志：`/tmp/sagit-wifi.log`、`/data/linux/var/log/Xorg.0.log`
+          files: dist/*
+          fail_on_unmatched_files: false

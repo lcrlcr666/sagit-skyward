@@ -1,0 +1,20 @@
+# 最小 sepolicy：允许 recovery 域操作 wlan / 网络设备
+# 只需覆盖 TWRP 默认策略里缺的几项，其余走 recovery.te
+type wlan_device, dev_type;
+type persist_wlan_mac_file, file_type;
+type romget_data_file, file_type;
+
+# /dev/wlan0 之类字符设备（部分内核把 wlan 当 net_device 不需要节点，保留以便兼容）
+allow recovery wlan_device:chr_file rw_file_perms;
+
+# persist 下 MAC 文件
+allow recovery persist_wlan_mac_file:file { create read write open getattr setattr rename unlink };
+allow recovery persist_file:dir { search write add_name remove_name };
+
+# 网络套接字（wpa_supplicant / dhcpcd 由 recovery 起）
+allow recovery self:udp_socket { create bind read write ioctl };
+allow recovery self:tcp_socket { create connect read write ioctl };
+
+# 允许 recovery 域访问 netlink route / 通用网络控制
+allow recovery self:netlink_route_socket { create bind read write nlmsg_read nlmsg_write };
+allow recovery self:netlink_generic_socket { create bind read write nlmsg_read nlmsg_write };

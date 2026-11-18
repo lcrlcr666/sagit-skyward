@@ -1,0 +1,20 @@
+# 构建产物
+out/
+build/
+*.img
+*.img.part-*
+*.zip
+*.log
+
+# 大文件别进仓库
+rootfs-sagit.img
+device/xiaomi/sagit/prebuilt/firmware/*
+!device/xiaomi/sagit/prebuilt/firmware/.gitkeep
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+device/xiaomi/sagit/security/

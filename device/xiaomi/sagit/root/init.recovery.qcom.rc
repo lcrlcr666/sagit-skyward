@@ -1,0 +1,37 @@
+# init.recovery.qcom.rc — sagit / msm8998
+# 作用：挂载固件分区 → 载入 qca_cld3_wlan → 拉起 wpa_supplicant
+# 说明：TWRP/Skyward 的 recovery init 也会走 on boot 触发器，故二次触发无副作用
+
+on early-init
+    mkdir /persist 0755 system system
+    mkdir /vendor 0755 root root
+    mkdir /vendor/firmware 0755 root root
+    mkdir /vendor/firmware_mnt 0755 root root
+    mkdir /vendor/lib/modules 0755 root root
+
+on init
+    export PATH /sbin:/system/bin:/system/xbin
+    symlink /vendor/firmware /firmware
+
+on post-fs-data
+    # 只在 data 已解密/可用时尝试联网（避免卡在解密界面之前）
+    start sagit-wifi
+
+on boot
+    start sagit-wifi
+
+service sagit-wifi /system/bin/sh /sbin/sagit-wifi-up.sh
+    class late_start
+    user root
+    group root net_admin wifi inet
+    seclabel u:r:recovery:s0
+    oneshot
+    disabled
+
+service sagit-wifid /system/bin/sh /sbin/sagit-wifi-daemon.sh
+    class late_start
+    user root
+    group root net_admin wifi inet
+    seclabel u:r:recovery:s0
+    oneshot
+    disabled
