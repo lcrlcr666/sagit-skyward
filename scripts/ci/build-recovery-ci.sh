@@ -104,13 +104,27 @@ source build/envsetup.sh
 lunch skyward_sagit-eng || { echo "!! lunch 失败：检查 AndroidProducts.mk / 缺模块"; exit 1; }
 
 step "5. 编译 recoveryimage（首次约 50-70 分钟）"
-/usr/bin/time -v mka -j"$JOBS" recoveryimage 2>&1 | tail -40 || true
+# 注意：mka 是 envsetup.sh 定义的 shell 函数，不能用 `/usr/bin/time` 包装
+# （会报 "cannot run mka: No such file or directory"）。整段输出落盘，失败可查。
+set -o pipefail
+if ! mka -j"$JOBS" recoveryimage > >(tee /tmp/mka.log) 2>&1; then
+    echo "!! 构建失败，日志尾部："
+    tail -60 /tmp/mka.log
+fi
+tail -15 /tmp/mka.log
 set -u
 IMG=out/target/product/sagit/recovery.img
-[ -f "$IMG" ] || { echo "!! 没有产出 $IMG"; ls -l out/target/product/sagit/ | tail -20; exit 1; }
+[ -f "$IMG" ] || {
+    echo "!! 没有产出 $IMG"
+    ls -l out/target/product/sagit/ 2>/dev/null | tail -20
+    mkdir -p "$ARTIFACT_DIR"
+    cp /tmp/mka.log "$ARTIFACT_DIR/mka.log" 2>/dev/null
+    exit 1
+}
 
 step "6. 产物"
 mkdir -p "$ARTIFACT_DIR"
 cp "$IMG" "$ARTIFACT_DIR/recovery.img"
+cp /tmp/mka.log "$ARTIFACT_DIR/mka.log" 2>/dev/null || true
 ls -lh "$ARTIFACT_DIR"
 echo ">> 完成：$ARTIFACT_DIR/recovery.img"

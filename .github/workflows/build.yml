@@ -126,19 +126,22 @@ jobs:
         run: bash scripts/ci/build-recovery-ci.sh
 
       - name: 汇总产物
+        if: always()
         run: |
           mkdir -p "$ARTIFACT_DIR"
-          cp "${{ runner.temp }}/aosp/out/target/product/sagit/recovery.img" "$ARTIFACT_DIR/"
+          cp "${{ runner.temp }}/aosp/out/target/product/sagit/recovery.img" "$ARTIFACT_DIR/" 2>/dev/null || true
+          cp /tmp/mka.log "$ARTIFACT_DIR/mka.log" 2>/dev/null || true
           cd "$ARTIFACT_DIR"
-          sha256sum recovery.img > recovery.img.sha256
-          ls -lh
+          [ -f recovery.img ] && sha256sum recovery.img > recovery.img.sha256 || echo "（无 recovery.img，仅上传编译日志）"
+          ls -lh || true
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: recovery-sagit
           path: artifacts/*
           retention-days: 14
-          if-no-files-found: error
+          if-no-files-found: warn
 
   # ------------------------------------------------------------------ 浏览器内核镜像
   rootfs:
