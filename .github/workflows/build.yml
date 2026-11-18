@@ -14,7 +14,7 @@ on:
         default: 'https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git'
       kernel_branch:
         description: '内核分支'
-        default: 'lineage-18.1'
+        default: 'staging/lineage-16.0'
       kernel_clang:
         description: 'kernel_mode=source 时用 clang 编内核（jammy 缺 32 位 ncurses，建议 true）'
         type: choice
