@@ -1,0 +1,24 @@
+# sagit-drm.fragment —— 只给内核开 DRM/KMS（Skyward 画界面要用 /dev/dri/card0）
+#
+# 为什么需要：
+#   TWRP/OrangeFox 的内核只编了老的 mdss_fb（/dev/graphics/fb0），没有 CONFIG_DRM，
+#   实测设备上 `/dev/dri`、`/sys/class/drm` 都不存在。Skyward 的界面走 DRM/KMS
+#   （kms: connector / crtc / plane / page flip），没有 card0 就起不来。
+#
+# 注意：这里**不要**放 CONFIG_WCNSS_CORE 之类的无线选项，那会让 wcnss_wlan.c
+# 走进该内核版本不存在的调试路径，编译直接失败（之前踩过）。
+
+CONFIG_DRM=y
+CONFIG_DRM_MSM=y
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_KMS_HELPER=y
+CONFIG_DRM_PANEL=y
+CONFIG_DRM_BRIDGE=y
+CONFIG_FB=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_VT=y
+CONFIG_VT_CONSOLE=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_UNIX98_PTYS=y
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_TMPFS_XATTR=y

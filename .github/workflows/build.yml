@@ -26,6 +26,11 @@ on:
       manifest_branch:
         description: 'recovery manifest 分支'
         default: 'twrp-9.0'
+      kernel_fragment:
+        description: '内核片段：false=不追加 / true=DRM / wifi=WiFi 实验'
+        type: choice
+        options: ['false', 'true', 'wifi']
+        default: 'false'
       rootfs_size_mb:
         description: '浏览器镜像大小(MB)，4G 内存机建议 3072'
         default: '2560'
@@ -120,6 +125,7 @@ jobs:
           KERNEL_REPO: ${{ inputs.kernel_repo || 'https://github.com/LineageOS/android_kernel_xiaomi_msm8998.git' }}
           KERNEL_BRANCH: ${{ inputs.kernel_branch || 'lineage-18.1' }}
           KERNEL_CLANG: ${{ inputs.kernel_clang || 'true' }}
+          KERNEL_FRAGMENT: ${{ inputs.kernel_fragment || 'false' }}
           PREBUILT_KERNEL_URL: ${{ inputs.prebuilt_kernel_url }}
           DEVICE_DIR: ${{ github.workspace }}/device/xiaomi/sagit
           AOSP_DIR: ${{ runner.temp }}/aosp

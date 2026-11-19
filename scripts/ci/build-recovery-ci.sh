@@ -86,7 +86,12 @@ if [ "$KERNEL_MODE" = "source" ]; then
     # WiFi 本来也不依赖它：模块在 /vendor/lib/modules，由运行时脚本 insmod。
     # 需要试验性选项时再打开：KERNEL_FRAGMENT=true
     if [ "${KERNEL_FRAGMENT:-false}" = "true" ]; then
-        FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-wifi.fragment"
+        # 默认用 DRM 片段（Skyward 需要 /dev/dri）；要试 WiFi 选项时用 KERNEL_FRAGMENT=wifi
+        if [ "${KERNEL_FRAGMENT}" = "wifi" ]; then
+            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-wifi.fragment"
+        else
+            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-drm.fragment"
+        fi
         if [ -f "$FRAG" ] && ! grep -q 'CONFIG_DRM_FBDEV_EMULATION' "$DEFCONFIG"; then
             echo ">> 追加内核 fragment（实验性）"
             cat "$FRAG" >> "$DEFCONFIG"
