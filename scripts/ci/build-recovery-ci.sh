@@ -127,9 +127,15 @@ else
         echo ">> 下载预编译内核：$PREBUILT_KERNEL_URL"
         curl -fL --retry 3 --max-time 600 -o kernel/Image.gz-dtb "$PREBUILT_KERNEL_URL"
     else
-        echo ">> 未提供直链，从官方 TWRP 镜像抽内核（kernel_mode=prebuilt 的默认路径）"
+        echo ">> 未提供直链：先试官方 TWRP，失败则从 LineageOS 官方 ROM 抽内核"
         OUTDIR="$AOSP_DIR/kernel-prebuilt" \
-            bash "${GITHUB_WORKSPACE:-$PWD}/scripts/ci/fetch-prebuilt-kernel.sh" "$AOSP_DIR"
+            bash "${GITHUB_WORKSPACE:-$PWD}/scripts/ci/fetch-prebuilt-kernel.sh" "$AOSP_DIR" \
+        || {
+            echo ">> TWRP 源不可用，切换到 LineageOS nightlies"
+            OUTDIR="$AOSP_DIR/kernel-los" \
+                bash "${GITHUB_WORKSPACE:-$PWD}/scripts/ci/fetch-kernel-from-los.sh" "$AOSP_DIR/kernel-los"
+            cp "$AOSP_DIR/kernel-los/Image.gz-dtb" "$AOSP_DIR/kernel-prebuilt/Image.gz-dtb"
+        }
         cp "$AOSP_DIR/kernel-prebuilt/Image.gz-dtb" kernel/Image.gz-dtb
     fi
     ls -lh kernel/Image.gz-dtb
