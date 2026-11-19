@@ -29,7 +29,7 @@ OUT="$DL_DIR/$(basename "${URL%%\?*}")"
 # 确保联网（WiFi 未起则先修）
 if ! ip -4 addr show wlan0 2>/dev/null | grep -q 'inet '; then
     echo "[romget] wlan0 无 IP，先执行 sagit-wifi-up.sh"
-    /system/bin/sh /sbin/sagit-wifi-up.sh
+    /system/bin/sh /etc/sagit/sagit-wifi-up.sh
 fi
 
 echo "[romget] -> $OUT"
@@ -57,7 +57,7 @@ while [ $n -lt 5 ]; do
     esac
     echo "[romget] 第 $n 次失败，5s 后重试"
     sleep 5
-    /system/bin/sh /sbin/sagit-wifi-up.sh
+    /system/bin/sh /etc/sagit/sagit-wifi-up.sh
 done
 [ $n -ge 5 ] && { echo "[romget] 放弃"; exit 2; }
 

@@ -20,7 +20,7 @@ on post-fs-data
 on boot
     start sagit-wifi
 
-service sagit-wifi /system/bin/sh /sbin/sagit-wifi-up.sh
+service sagit-wifi /system/bin/sh /etc/sagit/sagit-wifi-up.sh
     class late_start
     user root
     group root net_admin wifi inet
@@ -28,7 +28,7 @@ service sagit-wifi /system/bin/sh /sbin/sagit-wifi-up.sh
     oneshot
     disabled
 
-service sagit-wifid /system/bin/sh /sbin/sagit-wifi-daemon.sh
+service sagit-wifid /system/bin/sh /etc/sagit/sagit-wifi-daemon.sh
     class late_start
     user root
     group root net_admin wifi inet

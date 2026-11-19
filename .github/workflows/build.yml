@@ -80,7 +80,7 @@ jobs:
           set -e
           grep -q 'BOARD_BOOTIMG_HEADER_VERSION := 0' device/xiaomi/sagit/BoardConfig.mk
           grep -q 'TW_LOAD_VENDOR_MODULES' device/xiaomi/sagit/BoardConfig.mk
-          test -f device/xiaomi/sagit/recovery/root/sbin/sagit-wifi-up.sh
+          test -f device/xiaomi/sagit/recovery/root/etc/sagit/sagit-wifi-up.sh
           test -f device/xiaomi/sagit/recovery/root/etc/WCNSS_qcom_cfg.ini
           echo "设备树自检通过"
 

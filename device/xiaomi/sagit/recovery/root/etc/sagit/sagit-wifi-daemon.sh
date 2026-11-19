@@ -4,7 +4,7 @@
 while true; do
     if ! ip -4 addr show wlan0 2>/dev/null | grep -q 'inet '; then
         echo "[wifid] $(date) wlan0 掉线，重试" >>/tmp/sagit-wifi.log
-        /system/bin/sh /sbin/sagit-wifi-up.sh
+        /system/bin/sh /etc/sagit/sagit-wifi-up.sh
     fi
     sleep 20
 done

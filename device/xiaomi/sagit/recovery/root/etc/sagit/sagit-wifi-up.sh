@@ -88,7 +88,7 @@ mkdir -p $FW/wlan/qca_cld
 if [ ! -s "$CFG" ]; then
     log "WCNSS_qcom_cfg.ini 缺失，用 ramdisk 内置版本"
     cp -f /etc/WCNSS_qcom_cfg.ini $CFG 2>/dev/null || \
-      cp -f /sbin/WCNSS_qcom_cfg.ini $CFG 2>/dev/null
+      cp -f /etc/WCNSS_qcom_cfg.ini $CFG 2>/dev/null
 fi
 # 强制本机 MAC（部分固件不读 persist，只读 ini）
 if [ -s "$CFG" ]; then

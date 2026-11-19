@@ -87,6 +87,30 @@ if [ "$KERNEL_MODE" = "source" ]; then
     if [ "$KERNEL_CLANG" = "true" ]; then
         echo 'TARGET_KERNEL_CLANG_COMPILE := true' >> device/xiaomi/sagit/BoardConfig.mk
     fi
+
+    # gcc 10+ 默认 -fno-common，而 4.4 内核的 dtc 依赖 tentative definition：
+    # dtc-lexer.lex.o 与 dtc-parser.tab.o 都定义 yylloc，链接时报
+    #   multiple definition of `yylloc'; ... first defined here
+    # 给这两个目标加回 -fcommon 即可（内核 4.x 在 GCC 10+ 上的经典补丁）。
+    DTC_MK=kernel/xiaomi/msm8998/scripts/dtc/Makefile
+    if [ -f "$DTC_MK" ] && ! grep -q 'fcommon' "$DTC_MK"; then
+        echo ">> 给 dtc 打 -fcommon 补丁（GCC 10+ 环境）"
+        {
+            echo ''
+            echo '# added by CI: GCC 10+ 默认 -fno-common，dtc 的 yylloc 需要 tentative definition'
+            echo 'HOSTCFLAGS_dtc-lexer.lex.o += -fcommon'
+            echo 'HOSTCFLAGS_dtc-parser.tab.o += -fcommon'
+            echo 'HOSTCFLAGS_dtc.o += -fcommon'
+            echo 'HOSTCFLAGS_flattree.o += -fcommon'
+            echo 'HOSTCFLAGS_fstree.o += -fcommon'
+            echo 'HOSTCFLAGS_data.o += -fcommon'
+            echo 'HOSTCFLAGS_livetree.o += -fcommon'
+            echo 'HOSTCFLAGS_treesource.o += -fcommon'
+            echo 'HOSTCFLAGS_srcpos.o += -fcommon'
+            echo 'HOSTCFLAGS_checks.o += -fcommon'
+            echo 'HOSTCFLAGS_util.o += -fcommon'
+        } >> "$DTC_MK"
+    fi
 else
     # prebuilt 模式：有直链就用直链，没有就自动从官方 TWRP 镜像里抽内核
     if [ -n "${PREBUILT_KERNEL_URL:-}" ]; then
