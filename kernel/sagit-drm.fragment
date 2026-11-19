@@ -1,22 +1,20 @@
-# sagit-drm.fragment —— 让 sagit 的内核走 DRM/KMS（Skyward 画界面必须）
+# sagit-drm.fragment —— 显示栈换成 DRM + 打开 WiFi 的调试通道
 #
-# 背景（实测，两轮 CI 的结论）：
-#   1. 默认 sagit_defconfig 只有老的 fbdev 显示栈：
-#        CONFIG_FB=y / CONFIG_FB_MSM=y / CONFIG_FB_MSM_MDSS=y
-#      设备上只有 /dev/graphics/fb0，`/dev/dri` 和 `/sys/class/drm` 都不存在。
-#      Skyward 的界面是 DRM/KMS（atomic commit、plane、page flip），没有 card0 起不来。
-#   2. 只追加 CONFIG_DRM=y + CONFIG_DRM_MSM=y 会编过一半然后链接失败：
-#        sde_io_util.c: multiple definition of `msm_dss_enable_clk'
-#        sde_io_util.c: multiple definition of `msm_dss_config_vreg'
-#      因为 fbdev 的 mdss_io_util.c 和 DRM 的 sde_io_util.c 各自定义了同一组
-#      `msm_dss_*` 辅助函数，两套显示栈不能同时编进内核。
+# 两件事：
+# 1) 显示：默认 sagit_defconfig 只有老的 fbdev 栈（CONFIG_FB_MSM_MDSS），
+#    设备上没有 /dev/dri。Skyward 的界面走 DRM/KMS，所以这里开 DRM 并关掉
+#    冲突的 fbdev 栈（两套 mdss_io_util.c / sde_io_util.c 定义同名符号）。
+# 2) WiFi：CONFIG_QCA_CLD_WLAN 在 sagit_defconfig 里是内建（=y），所以驱动
+#    就在内核里，不需要厂商 .ko。这里打开 ICNSS_DEBUG / DYNAMIC_DEBUG /
+#    DEBUG_FS，好让 WCNSS 引导失败时有地方可看：
+#      mount -t debugfs debugfs /sys/kernel/debug
+#      cat /sys/kernel/debug/icnss/*
+#      echo 'file icnss* +p' > /sys/kernel/debug/dynamic_debug/control
 #
-# 所以：开 DRM 的同时必须关掉老的 fbdev MSM 显示栈。defconfig 里后写的行生效，
-# 这里用 `# CONFIG_x is not set` 覆盖前面的 `=y`。
-#
-# 不要放 CONFIG_WCNSS_* —— 那会让 wcnss_wlan.c 走进该内核版本不存在的调试路径。
+# 不要放 CONFIG_WCNSS_CORE 之类的无线组合项 —— 那会让 wcnss_wlan.c 走进
+# 该内核版本不存在的调试路径，编译直接失败（踩过）。
 
-# ---- 新的 DRM/KMS 显示栈 ----
+# ---- DRM/KMS 显示栈 ----
 CONFIG_DRM=y
 CONFIG_DRM_MSM=y
 CONFIG_DRM_MSM_DSI=y
@@ -34,14 +32,21 @@ CONFIG_DRM_FBDEV_EMULATION=y
 CONFIG_FB=y
 CONFIG_FRAMEBUFFER_CONSOLE=y
 
-# ---- 关掉冲突的老 fbdev MSM 显示栈（同一组 msm_dss_* 符号）----
+# ---- 关掉冲突的老 fbdev MSM 栈 ----
 # CONFIG_FB_MSM is not set
 # CONFIG_FB_MSM_MDSS is not set
 # CONFIG_FB_MSM_MDSS_WRITEBACK is not set
 # CONFIG_FB_MSM_MDSS_HDMI_PANEL is not set
 # CONFIG_FB_MSM_MDSS_DP_PANEL is not set
 
-# ---- 输入 / VT / loop（recovery 与第二阶段 Linux 都要）----
+# ---- WiFi / WCNSS 的调试通道 ----
+CONFIG_DEBUG_FS=y
+CONFIG_DYNAMIC_DEBUG=y
+CONFIG_ICNSS=y
+CONFIG_ICNSS_DEBUG=y
+CONFIG_CNSS_GENL=y
+
+# ---- 输入 / VT / loop ----
 CONFIG_INPUT_EVDEV=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_BLK_DEV_LOOP=y
