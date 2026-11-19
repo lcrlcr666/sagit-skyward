@@ -29,7 +29,7 @@ on:
       kernel_fragment:
         description: '内核片段：false=不追加 / true=DRM / wifi=WiFi 实验'
         type: choice
-        options: ['false', 'true', 'wifi']
+        options: ['false', 'debug', 'drm', 'wifi']
         default: 'false'
       rootfs_size_mb:
         description: '浏览器镜像大小(MB)，4G 内存机建议 3072'

@@ -85,20 +85,27 @@ if [ "$KERNEL_MODE" = "source" ]; then
     #   implicit declaration of function 'wcnss_get_mux_control' [-Werror]
     # WiFi 本来也不依赖它：模块在 /vendor/lib/modules，由运行时脚本 insmod。
     # 需要试验性选项时再打开：KERNEL_FRAGMENT=true
-    if [ "${KERNEL_FRAGMENT:-false}" = "true" ]; then
-        # 默认用 DRM 片段（Skyward 需要 /dev/dri）；要试 WiFi 选项时用 KERNEL_FRAGMENT=wifi
-        if [ "${KERNEL_FRAGMENT}" = "wifi" ]; then
-            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-wifi.fragment"
-        else
-            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-drm.fragment"
-        fi
-        if [ -f "$FRAG" ] && ! grep -q 'CONFIG_DRM_FBDEV_EMULATION' "$DEFCONFIG"; then
-            echo ">> 追加内核 fragment（实验性）"
+    # 片段选择：false=不追加 / debug=只加 WiFi 调试 / drm=换 DRM 显示栈 / wifi=旧址
+    case "${KERNEL_FRAGMENT:-false}" in
+        false|"")
+            echo ">> 跳过内核 fragment（沿用 vendor defconfig）"
+            ;;
+        debug)
+            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-debug.fragment"
+            echo ">> 追加 WiFi 调试片段：$FRAG"
             cat "$FRAG" >> "$DEFCONFIG"
-        fi
-    else
-        echo ">> 跳过内核 fragment（默认不追加，沿用 vendor defconfig）"
-    fi
+            ;;
+        drm)
+            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-drm.fragment"
+            echo ">> 追加 DRM 片段：$FRAG"
+            cat "$FRAG" >> "$DEFCONFIG"
+            ;;
+        *)
+            FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-${KERNEL_FRAGMENT}.fragment"
+            echo ">> 追加片段：$FRAG"
+            [ -f "$FRAG" ] && cat "$FRAG" >> "$DEFCONFIG"
+            ;;
+    esac
     if [ "$KERNEL_CLANG" = "true" ]; then
         echo 'TARGET_KERNEL_CLANG_COMPILE := true' >> device/xiaomi/sagit/BoardConfig.mk
     fi

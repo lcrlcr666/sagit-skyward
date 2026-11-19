@@ -1,0 +1,26 @@
+# sagit-debug.fragment —— 只开 WiFi 的调试通道，显示栈保持原样
+#
+# 为什么不动显示：
+#   Skyward 的界面走 DRM/KMS，而 sagit 的 msm-4.4 里 DRM 与 fbdev 两套显示栈
+#   定义同名符号（sde_io_util.c / mdss_io_util.c 的 msm_dss_*），关掉 fbdev 就
+#   会连带丢掉触摸驱动依赖的 mdss_panel_* 符号，链接失败。这一轮只是为了看
+#   WiFi 卡在哪，所以显示栈一个字节都不改，只加调试开关。
+#
+# WiFi：CONFIG_QCA_CLD_WLAN 在 sagit_defconfig 里是内建（=y），驱动在内核里，
+#       不需要厂商 .ko。打开 ICNSS_DEBUG 后可以看 WCNSS 引导到哪一步。
+#
+# 用法（设备上）：
+#   mount -t debugfs debugfs /sys/kernel/debug
+#   echo 'file icnss* +p' > /sys/kernel/debug/dynamic_debug/control
+#   cat /sys/kernel/debug/icnss/fw_debug
+
+CONFIG_DEBUG_FS=y
+CONFIG_DYNAMIC_DEBUG=y
+CONFIG_ICNSS=y
+CONFIG_ICNSS_DEBUG=y
+CONFIG_CNSS_GENL=y
+CONFIG_CNSS_UTILS=y
+
+# 输入 / VT / loop 也保持不变
+CONFIG_INPUT_EVDEV=y
+CONFIG_BLK_DEV_LOOP=y
