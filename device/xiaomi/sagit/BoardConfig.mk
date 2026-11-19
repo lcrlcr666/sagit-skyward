@@ -126,8 +126,10 @@ WIFI_DRIVER_FW_PATH_P2P := "/vendor/firmware"
 WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
 
 # ---------------------------------------------------------------- SELinux
-BOARD_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy
-SEPOLICY_IGNORE_NEVERALLOW := true
+# 不放自定义策略：recovery 靠 cmdline 里的 androidboot.selinux=permissive 跑。
+# 自定义 .te 里一旦引用树里不存在的 type（实测 persist_file），
+# checkpolicy 会在 54% 处直接 parse error 中断整包编译。
+SELINUX_IGNORE_NEVERALLOWS := true
 
 # ---------------------------------------------------------------- 签名（Skyward 用自家 keys）
 # PRODUCT_DEFAULT_DEV_CERTIFICATE := $(DEVICE_PATH)/security/releasekey

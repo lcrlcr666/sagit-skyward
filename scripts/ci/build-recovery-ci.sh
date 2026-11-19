@@ -78,11 +78,21 @@ if [ "$KERNEL_MODE" = "source" ]; then
         git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_REPO" kernel/xiaomi/msm8998
     fi
     DEFCONFIG=kernel/xiaomi/msm8998/arch/arm64/configs/sagit_defconfig
-    if ! grep -q 'CONFIG_DRM_FBDEV_EMULATION' "$DEFCONFIG"; then
-        echo ">> 追加 WiFi / fbdev 内核选项"
+    # 内核 fragment 默认不追加。原因：LineageOS 的 sagit_defconfig 已经包含了
+    # wcnss/qca_cld 相关选项，硬塞 CONFIG_WCNSS_CORE=y 会让
+    # drivers/net/wireless/wcnss/wcnss_wlan.c 走一条该内核版本里并不存在的
+    # 调试路径，编译报：
+    #   implicit declaration of function 'wcnss_get_mux_control' [-Werror]
+    # WiFi 本来也不依赖它：模块在 /vendor/lib/modules，由运行时脚本 insmod。
+    # 需要试验性选项时再打开：KERNEL_FRAGMENT=true
+    if [ "${KERNEL_FRAGMENT:-false}" = "true" ]; then
         FRAG="${GITHUB_WORKSPACE:-$PWD}/kernel/sagit-wifi.fragment"
-        [ -f "$FRAG" ] || { echo "!! 找不到 $FRAG"; exit 1; }
-        cat "$FRAG" >> "$DEFCONFIG"
+        if [ -f "$FRAG" ] && ! grep -q 'CONFIG_DRM_FBDEV_EMULATION' "$DEFCONFIG"; then
+            echo ">> 追加内核 fragment（实验性）"
+            cat "$FRAG" >> "$DEFCONFIG"
+        fi
+    else
+        echo ">> 跳过内核 fragment（默认不追加，沿用 vendor defconfig）"
     fi
     if [ "$KERNEL_CLANG" = "true" ]; then
         echo 'TARGET_KERNEL_CLANG_COMPILE := true' >> device/xiaomi/sagit/BoardConfig.mk
