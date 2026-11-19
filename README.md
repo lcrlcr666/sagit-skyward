@@ -196,3 +196,62 @@ manifest_branch:    twrp-9.0               # 也可 twrp-8.1
 rootfs_size_mb:     2560                   # 4G 内存机改 3072（更小更稳）
 make_release:       true                   # 直接发 Release
 ```
+
+---
+
+## 9. CI 构建实录（已验证成功）
+
+`run 44463423597` 用时 **32 分钟**，产出 `recovery.img`：
+
+```
+32,899,072 字节    sha256 08c09f593000784bfa182b05d79ecd9e818c49585eafb3d766ba4f557ef02cdf
+头：ANDROID! v0, page_size 4096, kernel 15.2MB, ramdisk 17.6MB
+Release: https://github.com/lcrlcr666/sagit-skyward/releases/tag/v0.1-sagit-recovery
+```
+
+ramdisk 内容已用 `scripts/ci/verify_ramdisk.py` 解 cpio 逐项核对（3499 个条目）：
+
+```
+init.recovery.qcom.rc            1072
+etc/sagit/sagit-wifi-up.sh       6198
+etc/sagit/sagit-wifi-down.sh      380
+etc/sagit/sagit-wifi-daemon.sh    421
+etc/WCNSS_qcom_cfg.ini            994
+etc/wpa_supplicant.conf           489
+sbin/recovery / adbd / toybox / magiskboot
+```
+
+### 9.1 AOSP 9 在 Ubuntu 22.04 runner 上的 8 个坑（全部已解决）
+
+| # | 现象 | 根因 | 解法 |
+|---|---|---|---|
+| 1 | `apk: matchbox-window-manager no such package` | Alpine 包名错 | 改 `openbox` / `font-dejavu`（对照 APKINDEX 33107 个包核对） |
+| 2 | `envsetup.sh: version: unbound variable` | 脚本 `set -u` 与 envsetup 冲突 | source 期间 `set +u` |
+| 3 | `/usr/bin/time: cannot run mka` | `mka` 是 shell 函数 | 直接调用并 `tee` 日志 |
+| 4 | `clang.real: libtinfo.so.5` | jammy 只有 ncurses6 | 装 focal 的 `libtinfo5`/`libncurses5`，失败则软链 `so.5 -> so.6` |
+| 5 | `check_radio_versions.py` SyntaxError | `python-is-python3` 让 py2 脚本跑在 py3 | `python` 指回 python2（`/usr/local/bin/python`） |
+| 6 | 内核 `clang-stable/bin/clang` 不存在 | TWRP 最小树无该软链；且 `ln -sfn` 撞已存在目录时无效 | 先 `rm -rf` 再从可用 `clang-*` 里选一个建链 |
+| 7 | `multiple definition of yylloc`（dtc） | GCC 10+ 默认 `-fno-common` | 给 dtc 各目标补 `HOSTCFLAGS_*.o += -fcommon` |
+| 8 | `unknown type persist_file`（checkpolicy） | 自定义 .te 引用了 tree 里不存在的 type | 删自定义策略，靠 `androidboot.selinux=permissive` |
+
+另外两个设备树层面的问题：
+
+- **`PRODUCT_COPY_FILES` 不能指定 `recovery/root/` 的子目录**（`sbin/`、`etc/` 不会被创建）→ 改用 `TARGET_RECOVERY_DEVICE_DIRS` 机制，文件放 `device/xiaomi/sagit/recovery/root/`
+- **`sbin/` 在 baseline ramdisk 里不能安全合并**（`cp -rf` 报 `Not a directory`）→ 脚本改放 `recovery/root/etc/sagit/`，由 `init.recovery.qcom.rc` 用 `/system/bin/sh` 调用（不依赖可执行位）
+
+### 9.2 内核策略
+
+`kernel_mode=source` + `kernel_branch=staging/lineage-16.0` + `kernel_clang=false`（gcc 4.9）。
+
+注意：**不要追加 `kernel/sagit-wifi.fragment`**。里面 `CONFIG_WCNSS_CORE=y` 会让 `wcnss_wlan.c` 走该内核版本不存在的调试路径，报 `implicit declaration of 'wcnss_get_mux_control'`。WiFi 模块本来就在 `/vendor/lib/modules`，运行时 insmod，不依赖内核配置。需要试验时用 `KERNEL_FRAGMENT=true`。
+
+`kernel_mode=prebuilt` 的两级回退：官方 TWRP 镜像（twrp.me 会返回 HTML，有 `ANDROID!` 魔数校验）→ LineageOS 官方 ROM（`download.lineageos.org/api/v2/devices/sagit/builds`，sagit 至今仍有 nightly）。
+
+### 9.3 验证脚本
+
+```bash
+# 解 recovery.img 头 + 抽 kernel/ramdisk
+python scripts/ci/unpack_bootimg_v0.py --boot_img recovery.img --out out/
+# 解 ramdisk 的 cpio 并核对关键文件
+python scripts/ci/verify_ramdisk.py out/ramdisk
+```
