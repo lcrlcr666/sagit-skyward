@@ -1,7 +1,7 @@
 # Mi 6 (sagit) · Skyward Recovery 适配 + WiFi 修复 + 内置浏览器内核
 
 一套可直接落地的工程化方案：设备树、WiFi 修复链路、浏览器内核（双阶段 Linux + Chromium）、
-构建/刷入/验证脚本。全部内容在 `C:\Users\l1212\Desktop\sagit-skyward\` 下。
+构建/刷入/验证脚本。全部内容在 `D:\AndroidBuilds\sagit-skyward\` 下。
 
 ---
 

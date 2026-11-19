@@ -34,7 +34,7 @@ Get-Content "$env:USERPROFILE\.ssh\id_ed25519.pub" | Set-Clipboard
 ssh -T git@github.com
 # 期望：Hi <用户名>! You've successfully authenticated, but GitHub does not provide shell access.
 
-cd C:\Users\l1212\Desktop\sagit-skyward
+cd D:\AndroidBuilds\sagit-skyward
 git remote set-url origin git@github.com:<你的用户名>/sagit-skyward.git
 git remote -v
 ```
@@ -127,7 +127,7 @@ PRODUCT_DEFAULT_DEV_CERTIFICATE := device/xiaomi/sagit/security/releasekey
 
 ```powershell
 # 本地打包成 secret（base64 单行）
-cd C:\Users\l1212\Desktop\sagit-skyward\device\xiaomi\sagit
+cd D:\AndroidBuilds\sagit-skyward\device\xiaomi\sagit
 Compress-Archive -Path security\* -DestinationPath $env:TEMP\keys.zip -Force
 $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:TEMP\keys.zip"))
 $b64 | Set-Clipboard      # 粘到仓库 Settings → Secrets → New secret: SIGNING_KEY_B64
