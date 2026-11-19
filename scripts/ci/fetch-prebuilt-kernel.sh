@@ -61,35 +61,30 @@ is_bootimg "$OUTDIR/$MODEL" || {
 ls -lh "$OUTDIR/$MODEL"
 echo ">> sha256: $(sha256sum "$OUTDIR/$MODEL" | cut -d' ' -f1)"
 
-UNPACK="$AOSP_DIR/system/tools/mkbootimg/unpack_bootimg.py"
-[ -f "$UNPACK" ] || { echo "!! 找不到 $UNPACK（先 repo sync）"; exit 1; }
+# Android 9 没有 system/tools/mkbootimg（那是 Android 10 才有的），
+# 所以优先用仓库自带的 unpack_bootimg_v0.py；只有在新树上才回退到 AOSP 的脚本。
+SELF_UNPACK="${GITHUB_WORKSPACE:-$PWD}/scripts/ci/unpack_bootimg_v0.py"
+AOSP_UNPACK="$AOSP_DIR/system/tools/mkbootimg/unpack_bootimg.py"
 
 rm -rf "$OUTDIR/unpacked"; mkdir -p "$OUTDIR/unpacked"
 
-# AOSP 9 的 unpack_bootimg.py 可能是 py2 语法，也可能 py3，逐个解释器试。
-# （CI 里 `python` 已被我们指回 python2，所以三种都覆盖到）
-try_unpack() {
-    local py="$1"; shift
-    command -v "$py" >/dev/null 2>&1 || return 1
-    rm -rf "$OUTDIR/unpacked"; mkdir -p "$OUTDIR/unpacked"
-    "$py" "$UNPACK" --boot_img "$OUTDIR/$MODEL" --out "$OUTDIR/unpacked" "$@" 2>"$OUTDIR/unpack.err"
-}
-
-ok=0
-for py in python3 python2 python; do
-    for extra in "--format=mkbootimg" ""; do
-        # shellcheck disable=SC2086
-        if try_unpack "$py" $extra && [ -s "$OUTDIR/unpacked/kernel" ]; then
-            echo ">> 解包成功：$py $extra"
-            ok=1; break 2
+if [ -f "$SELF_UNPACK" ]; then
+    echo ">> 用自带解包器：$SELF_UNPACK"
+    python3 "$SELF_UNPACK" --boot_img "$OUTDIR/$MODEL" --out "$OUTDIR/unpacked" || {
+        echo "!! 自带解包器失败"; exit 1; }
+elif [ -f "$AOSP_UNPACK" ]; then
+    echo ">> 用 AOSP 解包器：$AOSP_UNPACK"
+    ok=0
+    for py in python3 python2 python; do
+        command -v "$py" >/dev/null 2>&1 || continue
+        if "$py" "$AOSP_UNPACK" --boot_img "$OUTDIR/$MODEL" --out "$OUTDIR/unpacked" 2>"$OUTDIR/unpack.err" \
+           && [ -s "$OUTDIR/unpacked/kernel" ]; then
+            echo ">> 解包成功：$py"; ok=1; break
         fi
     done
-done
-if [ $ok -ne 1 ]; then
-    echo "!! unpack_bootimg 全部尝试失败，最后一次错误："
-    cat "$OUTDIR/unpack.err" 2>/dev/null | tail -15
-    ls -lh "$OUTDIR/unpacked" 2>/dev/null
-    exit 1
+    [ $ok -eq 1 ] || { echo "!! AOSP 解包器失败"; cat "$OUTDIR/unpack.err" 2>/dev/null | tail -10; exit 1; }
+else
+    echo "!! 既没有自带解包器也没有 AOSP 解包器"; exit 1
 fi
 ls -lh "$OUTDIR/unpacked"
 

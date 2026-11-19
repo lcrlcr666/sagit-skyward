@@ -45,13 +45,18 @@ mkdir -p "$AOSP_DIR" && cd "$AOSP_DIR"
 if [ ! -d .repo ]; then
     repo init -u "$MANIFEST" -b "$MANIFEST_BRANCH" --depth=1 --no-repo-verify
 fi
-# 补 minimal-manifest 缺的项目（mkbootimg：打包 recovery.img 必需，
-# 也是我们抽 TWRP 内核时 unpack_bootimg.py 的来源）
-mkdir -p .repo/local_manifests
-cp "${GITHUB_WORKSPACE:-$PWD}/scripts/ci/local_manifests.xml" .repo/local_manifests/sagit.xml
+# 注意：Android 9 (Pie) 的 mkbootimg 在 system/core/mkbootimg，
+# `system/tools/mkbootimg` 是 Android 10 才独立出来的项目。
+# 之前误加过 local_manifests 去拉 system/tools/mkbootimg，
+# 结果 repo sync 直接 SyncFailFastError（该 tag 下没有这个 project）。
+# system/core 本来就在 manifest 里，所以什么都不用补。
 repo sync -c -j"$JOBS" --force-sync --no-clone-bundle --no-tags --fail-fast
 du -sh . 2>/dev/null | tail -1
-[ -f system/tools/mkbootimg/mkbootimg.py ] && echo ">> mkbootimg 已就位" || echo "!! mkbootimg 仍缺失"
+if [ -f system/core/mkbootimg/Android.mk ] || [ -f system/core/mkbootimg/Android.bp ]; then
+    echo ">> mkbootimg (system/core/mkbootimg) 已就位"
+else
+    echo "!! 缺 system/core/mkbootimg，打包 recovery.img 会失败"
+fi
 
 step "2. 放入设备树"
 mkdir -p device/xiaomi
