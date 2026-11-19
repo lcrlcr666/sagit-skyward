@@ -33,15 +33,13 @@ PRODUCT_PACKAGES += \
 # PRODUCT_PACKAGES += curl
 
 # ---------------------------------------------------------------- recovery ramdisk 覆盖
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/root/init.recovery.qcom.rc:recovery/root/init.recovery.qcom.rc \
-    $(LOCAL_PATH)/root/sbin/sagit-wifi-up.sh:recovery/root/sbin/sagit-wifi-up.sh \
-    $(LOCAL_PATH)/root/sbin/sagit-wifi-down.sh:recovery/root/sbin/sagit-wifi-down.sh \
-    $(LOCAL_PATH)/root/sbin/sagit-wifi-daemon.sh:recovery/root/sbin/sagit-wifi-daemon.sh \
-    $(LOCAL_PATH)/root/sbin/romget.sh:recovery/root/sbin/romget.sh \
-    $(LOCAL_PATH)/root/sbin/linux-boot.sh:recovery/root/sbin/linux-boot.sh \
-    $(LOCAL_PATH)/root/etc/wpa_supplicant.conf:recovery/root/etc/wpa_supplicant.conf \
-    $(LOCAL_PATH)/root/etc/WCNSS_qcom_cfg.ini:recovery/root/etc/WCNSS_qcom_cfg.ini
+# 用 TARGET_RECOVERY_DEVICE_DIRS 机制（BoardConfig 里已设 $(DEVICE_PATH)），
+# 把 device/xiaomi/sagit/recovery/root/ 整棵树拷进 recovery ramdisk，保留权限与目录结构。
+#
+# 注意：不要用 PRODUCT_COPY_FILES 写 `recovery/root/sbin/xxx` —— AOSP 9 只保证
+# `recovery/root/` 这一层存在，子目录（sbin/、etc/）不会被创建，实测报：
+#   cp: cannot create symbolic link '.../recovery/root/sbin/': No such file or directory
+# 目录结构在这里就是：recovery/root/{init.recovery.qcom.rc,sbin/*,etc/*}
 
 # ---------------------------------------------------------------- 固件（可选，体积大）
 # 不建议塞进 ramdisk（sagit recovery 分区 ~64MB）。cns2 会直接读已挂载的

@@ -130,6 +130,9 @@ CLDIR=prebuilts/clang/host/linux-x86
 if [ -d "$CLDIR" ]; then
     if [ ! -x "$CLDIR/clang-stable/bin/clang" ]; then
         echo ">> clang-stable 不可用，挑选可用版本建软链"
+        # clang-stable 可能是：不存在的软链 / 指向缺失版本的断链 / 一个空目录。
+        # `ln -sfn` 在目标是目录时会往目录里面建链接（等于没修），所以先删干净。
+        rm -rf "$CLDIR/clang-stable"
         for v in $(ls -d "$CLDIR"/clang-r* "$CLDIR"/clang-[0-9]* 2>/dev/null | sort -V -r); do
             if [ -x "$v/bin/clang" ]; then
                 ln -sfn "$(basename "$v")" "$CLDIR/clang-stable"
@@ -143,7 +146,7 @@ if [ -d "$CLDIR" ]; then
     if [ -x "$CLDIR/clang-stable/bin/clang" ]; then
         echo ">> clang-stable 可执行：$("$CLDIR/clang-stable/bin/clang" --version 2>/dev/null | head -1)"
     else
-        echo "!! 仍无可用 clang-stable，内核源码编译会失败（可改 kernel_mode=prebuilt）"
+        echo "!! 仍无可用 clang-stable（本次若不设 kernel_clang=true 则不影响）"
     fi
 fi
 
