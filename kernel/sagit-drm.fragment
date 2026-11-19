@@ -1,23 +1,47 @@
-# sagit-drm.fragment —— 只给内核开 DRM/KMS（Skyward 画界面要用 /dev/dri/card0）
+# sagit-drm.fragment —— 让 sagit 的内核走 DRM/KMS（Skyward 画界面必须）
 #
-# 为什么需要：
-#   TWRP/OrangeFox 的内核只编了老的 mdss_fb（/dev/graphics/fb0），没有 CONFIG_DRM，
-#   实测设备上 `/dev/dri`、`/sys/class/drm` 都不存在。Skyward 的界面走 DRM/KMS
-#   （kms: connector / crtc / plane / page flip），没有 card0 就起不来。
+# 背景（实测，两轮 CI 的结论）：
+#   1. 默认 sagit_defconfig 只有老的 fbdev 显示栈：
+#        CONFIG_FB=y / CONFIG_FB_MSM=y / CONFIG_FB_MSM_MDSS=y
+#      设备上只有 /dev/graphics/fb0，`/dev/dri` 和 `/sys/class/drm` 都不存在。
+#      Skyward 的界面是 DRM/KMS（atomic commit、plane、page flip），没有 card0 起不来。
+#   2. 只追加 CONFIG_DRM=y + CONFIG_DRM_MSM=y 会编过一半然后链接失败：
+#        sde_io_util.c: multiple definition of `msm_dss_enable_clk'
+#        sde_io_util.c: multiple definition of `msm_dss_config_vreg'
+#      因为 fbdev 的 mdss_io_util.c 和 DRM 的 sde_io_util.c 各自定义了同一组
+#      `msm_dss_*` 辅助函数，两套显示栈不能同时编进内核。
 #
-# 注意：这里**不要**放 CONFIG_WCNSS_CORE 之类的无线选项，那会让 wcnss_wlan.c
-# 走进该内核版本不存在的调试路径，编译直接失败（之前踩过）。
+# 所以：开 DRM 的同时必须关掉老的 fbdev MSM 显示栈。defconfig 里后写的行生效，
+# 这里用 `# CONFIG_x is not set` 覆盖前面的 `=y`。
+#
+# 不要放 CONFIG_WCNSS_* —— 那会让 wcnss_wlan.c 走进该内核版本不存在的调试路径。
 
+# ---- 新的 DRM/KMS 显示栈 ----
 CONFIG_DRM=y
 CONFIG_DRM_MSM=y
-CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_MSM_DSI=y
+CONFIG_DRM_MSM_DSI_STAGING=y
+CONFIG_DRM_MSM_DSI_PLL=y
+CONFIG_DRM_MSM_DSI_28NM_PHY=y
+CONFIG_DRM_MSM_DSI_20NM_PHY=y
+CONFIG_DRM_MSM_DSI_14NM_PHY=y
+CONFIG_DRM_MSM_DSI_10NM_PHY=y
+CONFIG_DRM_MIPI_DSI=y
 CONFIG_DRM_KMS_HELPER=y
 CONFIG_DRM_PANEL=y
 CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_FBDEV_EMULATION=y
 CONFIG_FB=y
 CONFIG_FRAMEBUFFER_CONSOLE=y
-CONFIG_VT=y
-CONFIG_VT_CONSOLE=y
+
+# ---- 关掉冲突的老 fbdev MSM 显示栈（同一组 msm_dss_* 符号）----
+# CONFIG_FB_MSM is not set
+# CONFIG_FB_MSM_MDSS is not set
+# CONFIG_FB_MSM_MDSS_WRITEBACK is not set
+# CONFIG_FB_MSM_MDSS_HDMI_PANEL is not set
+# CONFIG_FB_MSM_MDSS_DP_PANEL is not set
+
+# ---- 输入 / VT / loop（recovery 与第二阶段 Linux 都要）----
 CONFIG_INPUT_EVDEV=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_BLK_DEV_LOOP=y
